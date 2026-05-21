@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from service import (
     load_cache,
     search_applicant,
-    generate_pdf
+    generate_pdf,
+    upload_pdf_to_blob
 )
 
 import os
@@ -62,7 +63,7 @@ def get_applicant(application_id: str):
 
     try:
 
-        # LOAD CACHE
+        # LOAD CACHE FROM AZURE
         cache_data = load_cache()
 
         # SEARCH APPLICANT
@@ -134,30 +135,51 @@ def generate_certificate_pdf(
             f"{application_id}_{applicant_name}.pdf"
         )
 
+        # =====================================
+        # CREATE CERTIFICATES FOLDER
+        # =====================================
+        os.makedirs(
+            "certificates",
+            exist_ok=True
+        )
+
+        # =====================================
+        # PDF PATH
+        # =====================================
         pdf_path = os.path.join(
             "certificates",
             pdf_filename
         )
 
         # =====================================
-        # CHECK EXISTING PDF
+        # CHECK EXISTING LOCAL PDF
         # =====================================
         existing_pdf = None
 
         for file in os.listdir("certificates"):
 
-            if file.startswith(f"{application_id}_"):
+            if file.startswith(
+                f"{application_id}_"
+            ):
 
                 existing_pdf = file
                 break
-
 
         # =====================================
         # IF PDF EXISTS
         # =====================================
         if existing_pdf:
 
-            print("PDF already exists")
+            existing_path = os.path.join(
+                "certificates",
+                existing_pdf
+            )
+
+            # UPLOAD EXISTING PDF
+            blob_url = upload_pdf_to_blob(
+                existing_path,
+                existing_pdf
+            )
 
             return {
                 "success": True,
@@ -166,7 +188,7 @@ def generate_certificate_pdf(
                 "PDF already generated",
 
                 "pdf_url":
-                f"/download/{existing_pdf}"
+                blob_url
             }
 
         # =====================================
@@ -178,19 +200,36 @@ def generate_certificate_pdf(
             applicant
         )
 
+        # =====================================
         # CHECK PDF EXISTS
+        # =====================================
         if not os.path.exists(pdf_file):
 
             return {
                 "success": False,
+
                 "message":
                 "PDF generation failed"
             }
 
+        # =====================================
         # GET FILE NAME
-        filename = os.path.basename(pdf_file)
+        # =====================================
+        filename = os.path.basename(
+            pdf_file
+        )
 
+        # =====================================
+        # UPLOAD TO AZURE BLOB
+        # =====================================
+        blob_url = upload_pdf_to_blob(
+            pdf_file,
+            filename
+        )
+
+        # =====================================
         # RETURN SUCCESS
+        # =====================================
         return {
             "success": True,
 
@@ -198,7 +237,7 @@ def generate_certificate_pdf(
             "PDF Generated Successfully",
 
             "pdf_url":
-            f"/download/{filename}"
+            blob_url
         }
 
     except Exception as e:
@@ -210,7 +249,7 @@ def generate_certificate_pdf(
 
 
 # =========================================
-# PDF PREVIEW / DOWNLOAD
+# DOWNLOAD LOCAL PDF
 # =========================================
 @app.get("/download/{filename}")
 def download_pdf(filename: str):
@@ -222,8 +261,6 @@ def download_pdf(filename: str):
             "certificates",
             filename
         )
-
-        print("PDF PATH:", pdf_path)
 
         # CHECK FILE EXISTS
         if not os.path.exists(pdf_path):
@@ -238,7 +275,9 @@ def download_pdf(filename: str):
 
             path=pdf_path,
 
-            media_type="application/pdf"
+            media_type="application/pdf",
+
+            filename=filename
         )
 
     except Exception as e:

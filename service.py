@@ -5,6 +5,12 @@ import subprocess
 from datetime import datetime
 from openpyxl import load_workbook
 
+from blob_storage import (
+    blob_service_client,
+    CACHE_CONTAINER,
+    CERT_CONTAINER
+)
+
 
 # -----------------------------------
 # CONFIG
@@ -20,13 +26,42 @@ OUTPUT_FOLDER = "certificates"
 
 
 # -----------------------------------
-# LOAD CACHE
+# LOAD CACHE FROM AZURE BLOB
 # -----------------------------------
 def load_cache():
 
-    with open(CACHE_FILE, "r") as file:
+    try:
 
-        return json.load(file)
+        container_client = (
+            blob_service_client
+            .get_container_client(
+                CACHE_CONTAINER
+            )
+        )
+
+        blob_client = (
+            container_client
+            .get_blob_client(
+                CACHE_FILE
+            )
+        )
+
+        downloader = (
+            blob_client.download_blob()
+        )
+
+        data = downloader.readall()
+
+        return json.loads(data)
+
+    except Exception as e:
+
+        print(
+            "\nLOAD CACHE ERROR:",
+            e
+        )
+
+        return {}
 
 
 # -----------------------------------
@@ -86,6 +121,53 @@ def extract_year(date_string):
     except:
 
         return ""
+
+
+# -----------------------------------
+# UPLOAD PDF TO AZURE BLOB
+# -----------------------------------
+def upload_pdf_to_blob(
+    pdf_path,
+    filename
+):
+
+    try:
+
+        container_client = (
+            blob_service_client
+            .get_container_client(
+                CERT_CONTAINER
+            )
+        )
+
+        blob_client = (
+            container_client
+            .get_blob_client(
+                filename
+            )
+        )
+
+        with open(pdf_path, "rb") as data:
+
+            blob_client.upload_blob(
+                data,
+                overwrite=True
+            )
+
+        print(
+            "\nPDF Uploaded Successfully"
+        )
+
+        return blob_client.url
+
+    except Exception as e:
+
+        print(
+            "\nUPLOAD ERROR:",
+            e
+        )
+
+        return None
 
 
 # -----------------------------------
@@ -306,7 +388,7 @@ def generate_pdf(applicant):
     )
 
     # --------------------------------
-    # MOVE PDF TO CERTIFICATES FOLDER
+    # MOVE PDF
     # --------------------------------
 
     if os.path.exists(generated_pdf):
@@ -325,19 +407,34 @@ def generate_pdf(applicant):
         os.remove(temp_excel)
 
     # --------------------------------
+    # UPLOAD TO AZURE
+    # --------------------------------
+
+    filename = os.path.basename(
+        pdf_file
+    )
+
+    blob_url = upload_pdf_to_blob(
+        pdf_file,
+        filename
+    )
+
+    # --------------------------------
     # SUCCESS MESSAGE
     # --------------------------------
 
-    print("\nPDF Generated Successfully")
+    print(
+        "\nPDF Generated Successfully"
+    )
 
     print(
-        f"\nSaved PDF: "
-        f"{pdf_file}"
+        f"\nSaved PDF: {pdf_file}"
     )
+
     print(
-    f"\nSaved PDF: "
-    f"{pdf_file}"
+        f"\nBlob URL: {blob_url}"
     )
+
     return pdf_file
 
 
