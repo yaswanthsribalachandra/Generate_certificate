@@ -4,32 +4,27 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
-      - name: Create virtual environment
+      - name: Debug
         run: |
-          python -m venv antenv
-          source antenv/bin/activate
+          pwd
+          ls -la
 
       - name: Install dependencies
         run: |
-          source antenv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
@@ -37,9 +32,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            .
-            !antenv/
+          path: .
 
   deploy:
     runs-on: ubuntu-latest
@@ -62,8 +55,8 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_9D86EB36F6854ADE94AE6A8B17F9F8A3 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_2B3D5AF10F4A48B486F0433806CBBF54 }}
 
-      - name: Deploy to Azure Web App
+      - name: Deploy
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'genbackend'
-          slot-name: 'Production'
+          app-name: genbackend
+          slot-name: Production
