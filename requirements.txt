@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+gunicorn
+pymongo
+pydantic
+pydantic-settings
+python-dotenv
+openpyxl
+python-multipart
+jinja2
